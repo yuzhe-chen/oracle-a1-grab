@@ -2,6 +2,8 @@ name: grab
 on:
   schedule: [{cron: "*/5 * * * *"}]
   workflow_dispatch:
+    inputs:
+      since: {description: "chain start (epoch seconds)", required: false, default: ""}
 concurrency: {group: grab, cancel-in-progress: false}
 permissions: {contents: write, issues: write, actions: write}
 jobs:
@@ -30,6 +32,14 @@ jobs:
           SUBNET_ID: ${{ secrets.SUBNET_ID }}
           SSH_PUBKEY: ${{ secrets.SSH_PUBKEY }}
         run: python grab.py
+      # GitHub runs schedules late or not at all on new repos, so each run starts the next one; the chain stops on success
+      # or 72 hours after it began (the schedule above restarts it if it ever breaks)
+      - name: Start the next run
+        if: always() && steps.chk.outputs.skip != '1' && hashFiles('found.json') == ''
+        env: {GH_TOKEN: "${{ github.token }}"}
+        run: |
+          since="${{ github.event.inputs.since }}"; [ -n "$since" ] || since=$(date +%s)
+          if [ $(( $(date +%s) - since )) -lt 259200 ]; then gh workflow run grab.yml -f since="$since"; echo "next run started"; else echo "72 hours reached, chain stops"; fi
       - name: Record it, tell the owner, stop
         if: steps.chk.outputs.skip != '1' && hashFiles('found.json') != ''
         env: {GH_TOKEN: "${{ github.token }}"}
