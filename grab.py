@@ -19,8 +19,10 @@ live = [i for i in compute.list_instances(T, retry_strategy=NO_RETRY).data
 if live: done({"id": live[0].id, "size": "existing", "ad": live[0].availability_domain[-4:]})
 
 ads = [a.name for a in oci.identity.IdentityClient(cfg).list_availability_domains(T, retry_strategy=NO_RETRY).data]
-sizes = [(4, 24), (3, 18), (2, 12), (1, 6)]
-deadline = time.time() + 270
+# smallest first: small slots free up far more often, and an A1 server can be resized up to 4/24 later
+sizes = [(1, 6), (2, 12), (4, 24)]
+deadline = time.time() + 290
+slow = 0
 while time.time() < deadline:
     for o, m in sizes:
         for ad in ads:
@@ -35,6 +37,8 @@ while time.time() < deadline:
                 done({"id": r.data.id, "size": f"{o}/{m}", "ad": ad[-4:]})
             except oci.exceptions.ServiceError as e:
                 print(f"{o} OCPU/{m} GB {ad[-4:]}: {e.status} {e.code}", flush=True)
-                if e.status == 429: time.sleep(30)
-            time.sleep(12)
+                # back off only when Oracle asks (429), longer each time in a row; otherwise keep a short gap
+                if e.status == 429: slow = min(60, slow * 2 or 10); time.sleep(slow); continue
+                slow = 0
+            time.sleep(6)
 print("no capacity this run")
