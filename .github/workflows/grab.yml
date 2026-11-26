@@ -33,13 +33,15 @@ jobs:
           SSH_PUBKEY: ${{ secrets.SSH_PUBKEY }}
         run: python grab.py
       # GitHub runs schedules late or not at all on new repos, so each run starts the next one; the chain stops on success
-      # or 72 hours after it began (the schedule above restarts it if it ever breaks)
+      # (every 72 hours it starts a fresh chain; the schedule above restarts it if it ever breaks)
       - name: Start the next run
         if: always() && steps.chk.outputs.skip != '1' && hashFiles('found.json') == ''
         env: {GH_TOKEN: "${{ github.token }}"}
         run: |
           since="${{ github.event.inputs.since }}"; [ -n "$since" ] || since=$(date +%s)
-          if [ $(( $(date +%s) - since )) -lt 259200 ]; then gh workflow run grab.yml -f since="$since"; echo "next run started"; else echo "72 hours reached, chain stops"; fi
+          # after 72 hours a fresh chain starts (owner, 2026-11-26: keep trying until a server exists)
+          if [ $(( $(date +%s) - since )) -ge 259200 ]; then since=$(date +%s); echo "72 hours reached, starting a fresh chain"; fi
+          gh workflow run grab.yml -f since="$since"; echo "next run started
       - name: Record it, tell the owner, stop
         if: steps.chk.outputs.skip != '1' && hashFiles('found.json') != ''
         env: {GH_TOKEN: "${{ github.token }}"}
