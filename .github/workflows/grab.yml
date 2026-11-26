@@ -41,7 +41,7 @@ jobs:
           since="${{ github.event.inputs.since }}"; [ -n "$since" ] || since=$(date +%s)
           # after 72 hours a fresh chain starts (owner, 2026-11-26: keep trying until a server exists)
           if [ $(( $(date +%s) - since )) -ge 259200 ]; then since=$(date +%s); echo "72 hours reached, starting a fresh chain"; fi
-          gh workflow run grab.yml -f since="$since"; echo "next run started
+          gh workflow run grab.yml -f since="$since"; echo "next run started"
       - name: Record it, tell the owner, stop
         if: steps.chk.outputs.skip != '1' && hashFiles('found.json') != ''
         env: {GH_TOKEN: "${{ github.token }}"}
